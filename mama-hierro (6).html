@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mamá Hierro: aventura contra la anemia</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+<style>
+:root{--bg:#e6f2fa;--fg:#14213d;--card:#fff;--rose:#e8456b;--leaf:#2f8f4e;--bar:#cfdbe6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10162a;--fg:#e8eefc;--card:#1c2440;--bar:#2c3558}}
+:root[data-theme="dark"]{--bg:#10162a;--fg:#e8eefc;--card:#1c2440;--bar:#2c3558}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:"Trebuchet MS",system-ui,sans-serif;display:flex;justify-content:center}
+#app{width:100%;max-width:820px;padding:10px}
+h1{font-family:"Press Start 2P",monospace;font-size:clamp(12px,3vw,17px);line-height:1.5;margin:6px 0 10px}
+#hud{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:14px}
+#hb{font-family:"Press Start 2P",monospace;font-size:10px;color:var(--rose);min-width:210px}
+#barw{position:relative;flex:1;min-width:140px;height:16px;background:var(--bar);border-radius:8px;overflow:hidden}
+#bar{height:100%;width:0;background:var(--rose);transition:width .2s}
+#mark{position:absolute;top:0;bottom:0;width:3px;background:var(--fg)}
+#vc{font-size:13px;color:var(--leaf);min-width:140px;text-align:right}
+#stage{position:relative}
+canvas{width:100%;display:block;border-radius:10px;background:#8ed1fc}
+#fact{position:absolute;left:8px;right:8px;bottom:8px;background:var(--card);color:var(--fg);border-left:6px solid var(--leaf);padding:9px 12px;border-radius:8px;font-size:14px;line-height:1.4;display:none}
+#ov{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;padding:12px;background:rgba(10,16,40,.55);border-radius:10px}
+#card{background:var(--card);color:var(--fg);max-width:480px;padding:18px 20px;border-radius:12px;text-align:center;line-height:1.45;font-size:15px}
+#card h2{font-family:"Press Start 2P",monospace;font-size:14px;line-height:1.5;margin:0 0 10px}
+button{font:inherit;cursor:pointer}
+#go{margin-top:12px;background:var(--rose);color:#fff;border:0;border-radius:8px;padding:11px 22px;font-weight:700;font-size:16px}
+#go:focus-visible,.tb:focus-visible{outline:3px solid var(--fg);outline-offset:2px}
+#tc{display:flex;justify-content:space-between;margin-top:10px;gap:10px}
+.tb{flex:1;max-width:110px;height:64px;font-size:24px;border-radius:12px;border:2px solid var(--fg);background:var(--card);color:var(--fg);touch-action:none;user-select:none}
+.tb:active{background:var(--bar)}
+.sp{flex:1}
+small{display:block;margin-top:8px;opacity:.75;font-size:12px}
+</style>
+</head>
+<body>
+<div id="app">
+<h1>Mamá Hierro · <span id="lv">Nivel 1/10</span></h1>
+<div id="hud">
+<span id="hb"></span>
+<div id="barw"><div id="bar"></div><div id="mark"></div></div>
+<span id="vc"></span>
+</div>
+<div id="stage">
+<canvas id="c" width="640" height="360" aria-label="Juego de plataformas"></canvas>
+<div id="fact" role="status"></div>
+<div id="ov"><div id="card"></div></div>
+</div>
+<div id="tc">
+<button class="tb" id="bl" aria-label="Izquierda">◀</button>
+<button class="tb" id="br" aria-label="Derecha">▶</button>
+<span class="sp"></span>
+<button class="tb" id="bj" aria-label="Saltar">⬆</button>
+</div>
+<small>Teclado: flechas o A/D para moverte, espacio o ↑ para saltar. Juego educativo: no reemplaza la consulta con tu obstetra o médico.</small>
+</div>
+<script>
+const C=document.getElementById('c'),X=C.getContext('2d'),W=640,H=360;C.width=W*2;C.height=H*2;let END=3250,lvl=1,qn=1;
+const $=id=>document.getElementById(id);
+const FACTS=[
+"Se habla de anemia en el embarazo cuando la hemoglobina baja de 11 g/dL (a nivel del mar; en zonas de altura se ajusta según la altitud).",
+"El hierro de origen animal (sangrecita, hígado, bazo, carne roja) se absorbe mejor que el de lentejas, frijoles o espinaca.",
+"La vitamina C (naranja, limón, mandarina) ayuda a absorber el hierro. Acompaña tus comidas con limonada o fruta cítrica.",
+"El té, el café y las infusiones reducen la absorción del hierro. Evítalos junto con las comidas principales.",
+"Toma el suplemento de hierro y ácido fólico tal como te lo indique tu obstetra o médico, y acude a todos tus controles prenatales.",
+"La anemia puede causar cansancio, mareos y palidez, y aumenta el riesgo de parto prematuro y de bebé con bajo peso al nacer.",
+"Los lácteos y el calcio también reducen la absorción del hierro: sepáralos de tus comidas ricas en hierro y de tu suplemento.",
+"Las menestras (lentejas, frijoles) y las verduras de hoja verde aportan hierro; combínalas con carne o con vitamina C para aprovecharlo mejor.",
+"En el embarazo se necesita más hierro porque aumenta tu volumen de sangre y el bebé lo necesita para crecer y desarrollarse.",
+"La hemoglobina se mide con un análisis de sangre en tus controles prenatales: es la forma de saber si tienes anemia."
+];
+function rng(s){return()=>{s=Math.imul(s^s>>>15,s|1);s^=s+Math.imul(s^s>>>7,s|61);return((s^s>>>14)>>>0)/4294967296;};}
+const IRON=['🥩','🫘','🥬','🥚'],EM=['☕','🍵','🥤'];
+function build(n){
+ const r=rng(n*7919+13),d=(n-1)/9,G=[],P=[],Q=[],F=[],E=[],O=[],S=[],OB=[[140,194],[270,338]],N=4+Math.round(d*8);
+ let x=0,fi=0,end=0;
+ E.push([390,500,EM[n%3],.8+d*1.6,0]);S.push([280,48]);O.push([150,268]);
+ for(let i=0;i<=N;i++){
+  const last=i==N,w=last?520:i==0?620:Math.round(420-d*90+r()*110);
+  G.push([x,w]);
+  if(i>0&&!last){
+   const lo=x+180,hi=x+w-95,c=Math.min(Math.max(n>1||i==2?1:0,Math.round(.5+d*2+(r()-.5)*.8)),Math.max(1,Math.floor((hi-lo)/45))),pw=(hi-lo)/Math.max(c,1);
+   for(let j=0;j<c;j++)E.push([lo+j*pw,lo+(j+1)*pw,EM[(i+j)%3],.8+d*1.6+r()*.3,n>=4&&r()<d*.9?1:0]);
+  }
+  if(i>0&&!last&&r()<.7+d*.3){
+   const ox=x+70+Math.floor(r()*20);
+   if(r()<.5){const sw=16*(3+(r()<d?1:0)+(r()<d*.6?1:0));S.push([ox,sw]);OB.push([ox-10,ox+sw+10]);}
+   else{O.push([ox,268]);if(n>=5&&r()<.6)O.push([ox,236]);if(n>=3&&r()<d){O.push([ox+32,268]);}OB.push([ox-10,ox+74]);}
+  }
+  if(i>0&&!last&&n>=8&&r()<d*.6){O.push([x+w-62,268]);OB.push([x+w-72,x+w-20]);}
+  for(let fx=x+(i?50:80);fx<x+w-(last?280:50);fx+=95+d*45)if(!OB.some(o=>fx>o[0]&&fx<o[1])&&r()>d*.45)F.push([fx,262,fi++%5==3?'c':'i']);
+  if(i%2==1&&!last){const py=r()<.5?220:185,px=x+w*.5;P.push([px,py,96]);F.push([px+35,py-38,'i']);}
+  if(i==0)Q.push([200,210,(n*3)%FACTS.length]);
+  else if(i%3==2&&Q.length<3+Math.floor(d*3))Q.push([x+w*.2,200,(n*3+Q.length)%FACTS.length]);
+  if(last)end=x+250;else x+=w+(n<2?0:Math.round(40+d*32+r()*4));
+ }
+ return{G,P,Q,F,E,O,S,end};
+}
+let solids,foods,en,p,hb,boost,inv,cam,state='menu',fact=0,factT=0,seen,got,inh=0,shk=0,tk=0,spk=[];
+const keys={l:0,r:0,j:0};
+const hit=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+function reset(){
+ const L=build(lvl);END=L.end;qn=L.Q.length;
+ solids=L.G.map(([x,w])=>({x,y:300,w,h:60,g:1}));
+ L.P.forEach(([x,y,w])=>solids.push({x,y,w,h:16}));
+ L.Q.forEach(([x,y,q])=>solids.push({x,y,w:32,h:32,q,used:0}));
+ L.O.forEach(([x,y])=>solids.push({x,y,w:32,h:32,cr:1}));
+ spk=L.S.map(([x,w])=>({x:x+3,y:286,w:w-6,h:14,sx:x,sw:w}));
+ foods=L.F.map(([x,y,t],i)=>({x,y,w:26,h:26,c:t=='c',k:t=='c'?4:i%4,ok:1}));
+ en=L.E.map(([a,b,e,sp,h])=>({x:a,y:272,w:28,h:28,a,b,d:1,e,sp,h,t:40+Math.floor(a%30),vy:0,ok:1}));
+ p={x:40,y:200,w:24,h:30,vx:0,vy:0,on:0,f:1,t:0,cy:0,jb:0,jh:0,jmp:0};
+ hb=9-(lvl-1)*.12;boost=0;inv=0;cam=0;seen=0;got=0;inh=0;shk=0;
+ $('lv').textContent='Nivel '+lvl+'/10';
+ $('fact').style.display='none';factT=0;
+}
+function toast(m){$('fact').textContent=m;$('fact').style.display='block';factT=240;}
+function showFact(i){$('fact').textContent='💡 '+FACTS[i];$('fact').style.display='block';factT=420;}
+function overlay(t,m,b,fn){$('card').innerHTML='<h2>'+t+'</h2><div>'+m+'</div><button id="go">'+b+'</button>';$('ov').style.display='flex';$('go').onclick=fn||start;$('go').focus();state='menu';}
+function start(){reset();$('ov').style.display='none';state='play';}
+function lose(msg){overlay('¡Otra vez!',msg,'Reintentar');}
+function bump(s){if(s.q!==undefined&&!s.used){s.used=1;seen++;showFact(s.q);}}
+function step(){
+ for(const e of en)if(e.ok){
+  e.x+=e.d*e.sp;if(e.x<e.a)e.d=1;if(e.x>e.b)e.d=-1;
+  if(e.h){if(--e.t<=0&&e.y>=272){e.vy=-7.5;e.t=75;}e.vy+=.5;e.y=Math.min(272,e.y+e.vy);if(e.y>=272)e.vy=0;}
+ }
+ const dir=keys.r-keys.l,spd=3.6;
+ p.vx+=(dir*spd-p.vx)*(p.on?.3:.22);
+ if(!dir&&Math.abs(p.vx)<.15)p.vx=0;
+ if(dir)p.f=dir;
+ if(keys.j&&!p.jh)p.jb=7;else if(p.jb>0)p.jb--;
+ p.jh=keys.j;
+ if(p.on)p.cy=6;else if(p.cy>0)p.cy--;
+ if(p.jb>0&&p.cy>0){p.vy=-12.5;p.on=0;p.cy=0;p.jb=0;p.jmp=1;}
+ 
+ p.vy=Math.min(p.vy+.55,12);
+ p.x+=p.vx;if(p.x<0)p.x=0;
+ for(const s of solids)if(hit(p,s)){if(p.vx>0)p.x=s.x-p.w;else if(p.vx<0)p.x=s.x+s.w;}
+ p.y+=p.vy;p.on=0;
+ for(const s of solids)if(hit(p,s)){
+  if(p.vy>0){p.y=s.y-p.h;p.on=1;p.jmp=0;}
+  else if(p.vy<0){p.y=s.y+s.h;bump(s);}
+  p.vy=0;
+ }
+ if(p.y>H+60){lose('Caíste al vacío. Salta antes del borde.');return;}
+ if(boost>0)boost--;
+ if(inv>0)inv--;if(inh>0)inh--;
+ hb-=(lvl-1)*.00003;
+ for(const f of foods)if(f.ok&&hit(p,f)){
+  f.ok=0;
+  if(f.c){boost=480;}else{hb=Math.min(14,hb+(boost>0?.5:.3)*(inh>0?.4:1));got++;}
+ }
+ for(const e of en)if(e.ok){
+  if(hit(p,e)){
+   if(p.vy>0&&p.y+p.h-p.vy<=e.y+10){e.ok=0;p.vy=-8;p.jmp=0;}
+   else if(inv<=0){hb-=.3;inh=360;shk=12;inv=90;p.vy=-6;p.x+=p.x<e.x?-24:24;showFact(3);}
+  }
+ }
+ for(const k of spk)if(inv<=0&&hit(p,k)){hb-=.4;inv=90;shk=12;p.vy=-9;p.on=0;p.x-=p.f*18;toast('⚠️ ¡Pinchos! Sáltalos para no perder hemoglobina.');}
+ if(hb<7){lose('Tu hemoglobina bajó a nivel de anemia severa (menos de 7 g/dL). Evita té, café y gaseosas, o aplástalos saltando encima.');return;}
+ if(p.x>END){
+  const v=hb.toFixed(1);
+  if(hb>=11){const m='Hemoglobina final: <b>'+v+' g/dL</b>, por encima de 11.<br>Comer alimentos con hierro, tomar tu suplemento y asistir a tus controles te protege a ti y a tu bebé.';
+   if(lvl<10)overlay('¡Nivel '+lvl+' superado!',m,'Ir al nivel '+(lvl+1),()=>{lvl++;start();});
+   else overlay('¡Completaste los 10 niveles!',m+'<br>¡Ya sabes cómo ganarle a la anemia!','Jugar de nuevo',()=>{lvl=1;start();});}
+  else lose('Llegaste con hemoglobina de <b>'+v+' g/dL</b>, aún bajo 11. Recoge más alimentos con hierro y toma naranja antes.');
+ }
+ cam=Math.max(0,Math.min(p.x-220,END+120-W));
+}
+function txt(s,x,y,sz){X.font=sz+'px serif';X.fillText(s,x,y);}
+const OL='#2a2438';
+const rr=(x,y,w,h,r,c)=>{r=Math.min(r,w/2,h/2);X.beginPath();X.moveTo(x+r,y);X.arcTo(x+w,y,x+w,y+h,r);X.arcTo(x+w,y+h,x,y+h,r);X.arcTo(x,y+h,x,y,r);X.arcTo(x,y,x+w,y,r);X.closePath();X.fillStyle=c;X.fill();X.strokeStyle=OL;X.lineWidth=1.6;X.stroke();};
+const cc=(x,y,r,c)=>{X.beginPath();X.arc(x,y,r,0,7);X.fillStyle=c;X.fill();X.strokeStyle=OL;X.lineWidth=1.6;X.stroke();};
+function drawFood(k,x,y){
+ const cx=x+13,cy=y+13;
+ if(k==0){rr(x+2,y+6,22,15,7,'#b3262e');X.fillStyle='#e8727a';X.fillRect(x+7,y+10,8,2);X.fillRect(x+10,y+14,9,2);}
+ else if(k==1){cc(cx-5,y+8,3,'#a0662f');cc(cx+1,y+6,3,'#8a5a2b');cc(cx+6,y+9,3,'#a0662f');X.beginPath();X.arc(cx,y+11,11,0,Math.PI);X.closePath();X.fillStyle='#4f7fc4';X.fill();X.strokeStyle=OL;X.lineWidth=1.6;X.stroke();}
+ else if(k==2){X.beginPath();X.ellipse(cx,cy,7,11,.6,0,7);X.fillStyle='#2f9e44';X.fill();X.strokeStyle=OL;X.lineWidth=1.6;X.stroke();X.beginPath();X.moveTo(cx-6,cy+8);X.lineTo(cx+6,cy-8);X.strokeStyle='#8fe3a0';X.lineWidth=1.3;X.stroke();}
+ else if(k==3){X.beginPath();X.ellipse(cx,cy+1,12,10,0,0,7);X.fillStyle='#fff';X.fill();X.strokeStyle=OL;X.lineWidth=1.6;X.stroke();cc(cx,cy,5,'#ffc61a');}
+ else{cc(cx,cy+1,10,'#ff9f1c');X.fillStyle='rgba(255,255,255,.5)';X.beginPath();X.arc(cx-3,cy-2,3,0,7);X.fill();X.beginPath();X.ellipse(cx+3,y+2,5,2.5,-.5,0,7);X.fillStyle='#2f9e44';X.fill();X.strokeStyle=OL;X.stroke();}
+}
+function drawEn(e){
+ const x=e.x,y=e.y,k=EM.indexOf(e.e),st=Math.floor(tk/8)%2,ey=k==2?y+9:y+16,e1=x+10,e2=x+18;
+ X.fillStyle=OL;el(x+8+st*2,y+27,4,2.5);el(x+20-st*2,y+27,4,2.5);
+ X.save();X.translate(x+14,y+27);X.rotate(Math.sin(tk*.35+x)*.12);X.translate(0,-Math.abs(Math.sin(tk*.2+x))*2.5);X.translate(-x-14,-y-27);
+ if(k==2){rr(x+6,y+4,16,23,4,'#c0392b');X.fillStyle='#fff';X.fillRect(x+7,y+13,14,6);rr(x+9,y,10,5,2,OL);}
+ else{
+  rr(x+2,y+7,20,19,5,k?'#e9f0e0':'#8a5530');
+  X.fillStyle=k?'#9bcf6a':'#3a2212';X.fillRect(x+4,y+9,16,4);
+  X.beginPath();X.arc(x+23,y+16,5,-1.5,1.5);X.strokeStyle=OL;X.lineWidth=3;X.stroke();
+  if(k){X.beginPath();X.moveTo(x+14,y+9);X.lineTo(x+17,y+3);X.lineWidth=1.2;X.stroke();rr(x+15,y,6,4,1,'#ffd166');}
+  else{X.strokeStyle='rgba(120,120,120,.7)';X.lineWidth=1.5;X.beginPath();X.moveTo(x+9,y+5);X.quadraticCurveTo(x+6,y+1,x+10,y-2);X.stroke();}
+ }
+ cc(e1,ey,3,'#fff');cc(e2,ey,3,'#fff');
+ X.fillStyle=OL;el(e1+e.d*1.2,ey+.6,1.3,1.3);el(e2+e.d*1.2,ey+.6,1.3,1.3);
+ X.strokeStyle=OL;X.lineWidth=1.8;X.beginPath();X.moveTo(e1-4,ey-5);X.lineTo(e1+3,ey-2.5);X.moveTo(e2+4,ey-5);X.lineTo(e2-3,ey-2.5);X.stroke();
+ X.beginPath();X.arc(x+14,ey+10,3,Math.PI*1.1,Math.PI*1.9);X.lineWidth=1.4;X.stroke();
+ X.restore();
+}
+function drawP(){
+ p.t+=p.on?Math.abs(p.vx)*.14:0;
+ const sw=p.on&&p.vx?Math.sin(p.t)*4:0,air=!p.on,bob=p.on&&p.vx?Math.abs(Math.sin(p.t))*1.5:0;
+ X.save();X.translate(p.x+12,p.y-bob);X.scale(p.f,1);
+ if(boost>0){X.fillStyle='rgba(255,170,0,.35)';el(0,16,22,22);}
+ cc(-8,7,4,'#4a2c1a');
+ rr(air?-6:-6+sw,22,5,8,2,'#f6cf9b');rr(air?2:1-sw,air?21:22,5,8,2,'#f6cf9b');
+ rr(air?-8:-8+sw,28,8,3,1.5,'#d9534f');rr(air?1:-sw,air?27:28,8,3,1.5,'#d9534f');
+ X.beginPath();X.moveTo(-7,12);X.lineTo(7,12);X.lineTo(10,25);X.lineTo(-10,25);X.closePath();X.fillStyle='#2a9d8f';X.fill();X.strokeStyle=OL;X.lineWidth=1.6;X.stroke();
+ cc(6,19,6.5,'#34b3a3');
+ X.fillStyle='#fff';X.font='7px sans-serif';X.fillText('♥',3,21.5);
+ rr(-2,air?9:12,4,9,2,'#f6cf9b');
+ cc(0,6,7,'#f6cf9b');
+ X.beginPath();X.arc(0,5,7.3,Math.PI,0);X.closePath();X.fillStyle='#4a2c1a';X.fill();
+ X.fillStyle='#ffd166';X.fillRect(-7,3,14,2.5);
+ X.fillStyle=OL;X.fillRect(3,6,1.8,2.2);
+ X.fillStyle='rgba(232,69,107,.5)';el(4.5,10,2,1.4);
+ X.restore();
+}
+const el=(x,y,a,b)=>{X.beginPath();X.ellipse(x,y,a,b,0,0,7);X.fill();};
+function mtn(sp,col,base,hs){
+ const sh=cam*sp,i0=Math.floor(sh/180),o=-(sh%180),n=hs.length;
+ X.fillStyle=col;X.beginPath();X.moveTo(o-180,H);
+ for(let k=-1;k<=5;k++){X.lineTo(o+k*180+90,base-hs[((i0+k)%n+n)%n]);X.lineTo(o+(k+1)*180,base-20);}
+ X.lineTo(o+1100,H);X.closePath();X.fill();
+}
+function hosp(x){
+ X.fillStyle='#e9eef5';X.fillRect(x,226,90,74);X.strokeStyle=OL;X.lineWidth=1.5;X.strokeRect(x,226,90,74);X.fillStyle='#c9d3e0';X.fillRect(x-4,222,98,8);
+ X.fillStyle='#d9534f';X.fillRect(x+37,238,16,36);X.fillRect(x+27,248,36,16);
+ X.fillStyle='#7aa5d6';X.fillRect(x+8,276,18,24);X.fillRect(x+64,276,18,24);
+ X.fillStyle='#14213d';X.font='bold 10px sans-serif';X.fillText('CENTRO DE SALUD',x-6,216);
+}
+function draw(){
+ tk++;X.setTransform(2,0,0,2,0,0);
+ const g=X.createLinearGradient(0,0,0,H);g.addColorStop(0,'#5fb3e8');g.addColorStop(1,'#d8efff');
+ X.fillStyle=g;X.fillRect(0,0,W,H);
+ X.fillStyle='rgba(255,244,190,.4)';el(540,62,48,48);X.fillStyle='#fff4be';el(540,62,28,28);
+ mtn(.1,'#9bb3cc',250,[150,200,120,180]);
+ mtn(.25,'#6f8fae',290,[110,150,90,130,170]);
+ X.fillStyle='rgba(255,255,255,.85)';
+ for(let i=0;i<6;i++){const cx=((i*260-cam*.3)%(W+240)+W+240)%(W+240)-120,cy=40+(i%3)*28;el(cx,cy,34,12);el(cx+22,cy-8,22,11);el(cx-20,cy-4,20,9);}
+ X.save();
+ if(shk>0){X.translate((Math.random()-.5)*shk,(Math.random()-.5)*shk*.6);shk--;}
+ X.translate(-Math.round(cam),0);
+ const v0=cam-80,v1=cam+W+80;
+ for(const s of solids){
+  if(s.x+s.w<v0||s.x>v1)continue;
+  if(s.g){
+   X.fillStyle='#6b4423';X.fillRect(s.x,s.y,s.w,s.h);
+   const a=Math.max(s.x,Math.floor(v0/40)*40),b=Math.min(s.x+s.w,v1);
+   X.fillStyle='#5a371b';
+   for(let xx=a;xx<b;xx+=40)X.fillRect(xx+((xx*7)%23),s.y+18+((xx*13)%28),9,4);
+   X.fillStyle='#4c9a3c';X.fillRect(s.x,s.y,s.w,10);
+   X.fillStyle='#74c256';X.fillRect(s.x,s.y,s.w,3);
+   X.fillStyle='#3c7d30';
+   for(let xx=Math.max(s.x,Math.floor(v0/14)*14);xx<b;xx+=14)X.fillRect(xx,s.y+10,3,3+((xx*5)%4));
+  }else if(s.cr){
+   X.fillStyle='#c58b45';X.fillRect(s.x,s.y,32,32);
+   X.strokeStyle='#8a5a2b';X.lineWidth=3;X.strokeRect(s.x+3,s.y+3,26,26);
+   X.lineWidth=2;X.beginPath();X.moveTo(s.x+4,s.y+4);X.lineTo(s.x+28,s.y+28);X.moveTo(s.x+28,s.y+4);X.lineTo(s.x+4,s.y+28);X.stroke();
+   X.strokeStyle=OL;X.lineWidth=1.5;X.strokeRect(s.x,s.y,32,32);
+  }else if(s.q!==undefined){
+   X.fillStyle=s.used?'#9a9a9a':'#f4b400';X.fillRect(s.x,s.y,32,32);
+   X.fillStyle=s.used?'#b8b8b8':'#ffd966';X.fillRect(s.x,s.y,32,4);X.fillRect(s.x,s.y,4,32);
+   X.fillStyle=s.used?'#777':'#b07d00';X.fillRect(s.x,s.y+28,32,4);X.fillRect(s.x+28,s.y,4,32);
+   X.fillStyle='#fff';X.font='bold 20px sans-serif';X.fillText(s.used?'✓':'?',s.x+10,s.y+23);
+   X.strokeStyle=OL;X.lineWidth=1.5;X.strokeRect(s.x,s.y,32,32);
+  }else{
+   X.fillStyle='#a9743b';X.fillRect(s.x,s.y,s.w,s.h);
+   X.fillStyle='#cf9a5a';X.fillRect(s.x,s.y,s.w,4);
+   X.fillStyle='#7a5128';X.fillRect(s.x,s.y+s.h-3,s.w,3);
+   for(let xx=s.x+24;xx<s.x+s.w;xx+=24)X.fillRect(xx,s.y+4,1,s.h-7);
+   X.strokeStyle=OL;X.lineWidth=1.5;X.strokeRect(s.x,s.y,s.w,s.h);
+  }
+ }
+ for(const k of spk){for(let j=0;j<k.sw/16;j++){const bx=k.sx+j*16;X.beginPath();X.moveTo(bx,300);X.lineTo(bx+8,281);X.lineTo(bx+16,300);X.closePath();X.fillStyle='#cfd5de';X.fill();X.strokeStyle=OL;X.lineWidth=1.5;X.stroke();}X.fillStyle='#d9534f';X.fillRect(k.sx,297,k.sw,3);}
+ hosp(END+20);
+ for(const f of foods)if(f.ok){const b=Math.sin(tk*.07+f.x)*3;X.fillStyle='rgba(0,0,0,.18)';el(f.x+13,f.y+25,9,3);drawFood(f.k,f.x,f.y+b-2);}
+ for(const e of en)if(e.ok){X.fillStyle='rgba(0,0,0,.22)';el(e.x+14,299,Math.max(6,13-(272-e.y)*.08),3);drawEn(e);}
+ if(p.on){X.fillStyle='rgba(0,0,0,.22)';el(p.x+12,p.y+p.h,12,3);}
+ if(!(inv>0&&Math.floor(inv/6)%2))drawP();
+ X.restore();
+ if(hb<9.5){const a=Math.min(.45,(9.5-hb)*.18),gr=X.createRadialGradient(W/2,H/2,H*.35,W/2,H/2,H*.9);gr.addColorStop(0,'rgba(0,0,0,0)');gr.addColorStop(1,'rgba(20,0,10,'+a+')');X.fillStyle=gr;X.fillRect(0,0,W,H);}
+ $('bar').style.width=Math.max(0,Math.min(1,(hb-7)/7))*100+'%';
+ $('bar').style.background=hb>=11?'#2f8f4e':'#e8456b';
+ $('mark').style.left='57.1%';
+ $('hb').textContent='Hb '+hb.toFixed(1)+' · '+(hb>=11?'normal':hb>=10?'anemia leve':'anemia moderada');
+ $('vc').textContent=boost>0?'🍊 Vitamina C: el hierro rinde más':inh>0?'☕ Absorción de hierro reducida':'Alimentos: '+got+'  Datos: '+seen+'/'+qn;
+ if(factT>0){factT--;if(!factT)$('fact').style.display='none';}
+}
+let last=0,acc=0;
+function loop(t){
+ requestAnimationFrame(loop);
+ acc+=Math.min(50,t-last);last=t;
+ while(acc>16.67){if(state==='play'){try{step();}catch(e){console.error(e);}}acc-=16.67;}
+ if(solids){try{draw();}catch(e){console.error(e);}}
+}
+const KM={ArrowLeft:'l',a:'l',A:'l',ArrowRight:'r',d:'r',D:'r',ArrowUp:'j',w:'j',W:'j',' ':'j'};
+addEventListener('keydown',e=>{const k=KM[e.key];if(k){keys[k]=1;if(state==='play')e.preventDefault();}});
+addEventListener('keyup',e=>{const k=KM[e.key];if(k)keys[k]=0;});
+[['bl','l'],['br','r'],['bj','j']].forEach(([id,k])=>{
+ const b=$(id);
+ b.addEventListener('pointerdown',e=>{e.preventDefault();keys[k]=1;});
+ ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>keys[k]=0));
+});
+['pointerup','pointercancel'].forEach(ev=>C.addEventListener(ev,()=>keys.j=0));
+C.addEventListener('pointerdown',()=>{keys.j=1;});
+reset();
+$('card').innerHTML='<h2>Mamá Hierro</h2><div>Hay <b>10 niveles</b>, de fácil a difícil. Tu hemoglobina empieza cerca de <b>9 g/dL</b>. Llega al centro de salud 🏥 con <b>11 o más</b>.<br><br>🥩🫘🥬🥚 suben tu hemoglobina<br>🍊 hace que el hierro rinda más<br>☕🍵🥤 la bajan y frenan la absorción de hierro: aplástalos saltando encima<br>Con hemoglobina baja te cansas y vas más lento<br>Golpea los bloques <b>?</b> desde abajo para aprender.<br>⚠️ Salta las <b>cajas</b> y los <b>pinchos</b>: los pinchos te quitan hemoglobina.</div><button id="go">Empezar</button>';
+$('go').onclick=start;
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
